@@ -30,14 +30,17 @@ public class Trie
     public bool Insert(string word)
     {
         TrieNode current = root;
+        // for each character in the word
         foreach (char c in word)
         {
             if (!current.HasChild(c))
             {
+                // if the character is not in the trie, add it
                 current.Children[c] = new TrieNode(c);
             }
             current = current.Children[c];
         }
+        //if the word is already in the trie
         if (current.IsEndOfWord)
         {
             return false;
@@ -46,6 +49,25 @@ public class Trie
         return true;
     }
     
+    // Search for a word in the trie
+    public bool Search(string word) 
+    { 
+        TrieNode current = root;
+        foreach (char c in word)
+        {
+            if (!current.HasChild(c))
+            {
+                return false;
+            }
+            current = current.Children[c];
+        }
+        return current.IsEndOfWord;
+    }
+    /// <summary>
+    /// Retrieves a list of suggested words based on the given prefix.
+    /// </summary>
+    /// <param name="prefix">The prefix to search for.</param>
+    /// <returns>A list of suggested words.</returns>
     public List<string> AutoSuggest(string prefix)
     {
         TrieNode currentNode = root;
@@ -62,105 +84,98 @@ public class Trie
 
     private List<string> GetAllWordsWithPrefix(TrieNode root, string prefix)
     {
-        return null;
-    }
-
-    public List<string> GetAllWords()
-    {
-        return GetAllWordsWithPrefix(root, "");
-    }
-
-    public void PrintTrieStructure()
-    {
-        Console.WriteLine("\nroot");
-        _printTrieNodes(root);
-    }
-
-    private void _printTrieNodes(TrieNode root, string format = " ", bool isLastChild = true) 
-    {
+        List<string> words = new List<string>();
         if (root == null)
-            return;
-
-        Console.Write($"{format}");
-
-        if (isLastChild)
         {
-            Console.Write("└─");
-            format += "  ";
+            return words;
         }
-        else
+        if (root.IsEndOfWord)
         {
-            Console.Write("├─");
-            format += "│ ";
+            words.Add(prefix);
         }
-
-        Console.WriteLine($"{root._value}");
-
-        int childCount = root.Children.Count;
-        int i = 0;
-        var children = root.Children.OrderBy(x => x.Key);
-
-        foreach(var child in children)
+        foreach (var child in root.Children)
         {
-            i++;
-            bool isLast = i == childCount;
-            _printTrieNodes(child.Value, format, isLast);
+            words.AddRange(GetAllWordsWithPrefix(child.Value, prefix + child.Key));
         }
+        return words;
     }
 
-    public List<string> GetSpellingSuggestions(string word)
+    // Delete a word from the trie
+    // public bool Delete(string word)
+    // {
+    //     TrieNode current = root;
+    //     foreach (char c in word)
+    //     {
+    //         if (!current.HasChild(c))
+    //         {
+    //             // Word doesn't exist in trie
+    //             return false;
+    //         }
+    //         current = current.Children[c];
+    //     }
+    //     if (!current.IsEndOfWord)
+    //     {
+    //         // Word doesn't exist in trie
+    //         return false;
+    //     }
+    //     // Word exists in trie
+    //     // Set IsEndOfWord to false
+    //     current.IsEndOfWord = false;
+    //     return true;
+    // }  
+
+    // Helper method to delete a word from the trie by recursively removing its nodes
+    private bool _delete(TrieNode current, string word, int index)
     {
-        char firstLetter = word[0];
-        List<string> suggestions = new();
-        List<string> words = GetAllWordsWithPrefix(root.Children[firstLetter], firstLetter.ToString());
-        
-        foreach (string w in words)
+        // Base case: If the current node is null, the word doesn't exist in the trie
+        if (current == null)
         {
-            int distance = LevenshteinDistance(word, w);
-            if (distance <= 2)
+            return false;
+        }
+
+        // Base case: If all characters of the word have been processed
+        if (index == word.Length)
+        {
+            // If the current node is not the end of a word, the word doesn't exist in the trie
+            if (!current.IsEndOfWord)
             {
-                suggestions.Add(w);
+                return false;
+            }
+
+            // Set IsEndOfWord to false to mark the word as deleted
+            current.IsEndOfWord = false;
+
+            // Check if the current node has any children
+            if (current.Children.Count == 0)
+            {
+                // If the current node has no children, it can be safely removed from the trie
+                return true;
+            }
+
+            // If the current node has children, it is part of another word, so we don't delete it
+            return false;
+        }
+
+        char c = word[index];
+
+        // Recursive case: Delete the next character in the word
+        if (_delete(current.Children[c], word, index + 1))
+        {
+            // If the child node was deleted, remove the reference to it from the current node
+            current.Children.Remove(c);
+
+            // Check if the current node has any children
+            if (current.Children.Count == 0 && !current.IsEndOfWord)
+            {
+                // If the current node has no children and is not the end of a word, it can be safely removed from the trie
+                return true;
             }
         }
 
-        return suggestions;
+        return false;
     }
-
-    private int LevenshteinDistance(string s, string t)
+    
+    public bool Delete(string word)
     {
-        int m = s.Length;
-        int n = t.Length;
-        int[,] d = new int[m, n];
-
-        if (m == 0)
-        {
-            return n;
-        }
-
-        if (n == 0)
-        {
-            return m;
-        }
-
-        for (int i = 0; i <= m; i++)
-        {
-            d[i, 0] = i;
-        }
-
-        for (int j = 0; j <= n; j++)
-        {
-            d[0, j] = j;
-        }
-
-        for (int j = 0; j <= n; j++)
-        {
-            for (int i = 0; i <= m; i++)
-            {
-                int cost = (s[i] == t[j]) ? 0 : 1;
-                d[i, j] = Math.Min(Math.Min(d[i, j] + 1, d[i, j] + 1), d[i, j] + cost);
-            }
-        }
-
-        return d[m, n];
+        return _delete(root, word, 0);
     }
-}
